@@ -2,6 +2,7 @@
 
 namespace gpu {
 __global__ void add(SimEnergyDepCuda * deps) {
+  printf("Inside kernel\n");
   printf("%f\n", deps[0].Energy());
   return;
 }
