@@ -1,0 +1,11 @@
+BEGIN_PROLOG
+
+gpuana:
+{
+  module_type:            "GPUAnalyzer"
+  SimulationTag:        "IonAndScint"
+}
+
+
+END_PROLOG
+

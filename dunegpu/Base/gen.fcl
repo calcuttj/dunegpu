@@ -1,0 +1,3 @@
+#include "prod4_gen_protoDUNE_beam_cosmics_1GeV.fcl"
+
+physics.simulate: [ generator ]
