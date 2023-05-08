@@ -16,11 +16,11 @@
 # use cmake 3.12 or later
 cmake_minimum_required (VERSION 3.12)
 
-project(dunegpu LANGUAGES CXX C CUDA)
+project(dunegpu LANGUAGES CXX C CUDA) ##Note! Need to add CUDA to languages
 
 # cetbuildtools contains our cmake modules
 find_package(cetbuildtools REQUIRED)
-find_package( CUDA REQUIRED )
+find_package( CUDA REQUIRED ) ##Note! Make sure to find cuda
 
 list(APPEND CMAKE_MODULE_PATH
      $ENV{CANVAS_ROOT_IO_DIR}/Modules
@@ -31,6 +31,10 @@ list(APPEND CMAKE_MODULE_PATH
 include(CetCMakeEnv)
 cet_cmake_env()
 
+
+#Note! Creating new macro that only provides these compiler flags
+#for a given target. This is important because certain compiler flags
+#are incompatible with nvcc
 macro(cet_set_target_compiler_flags _target)
   cmake_parse_arguments(CSCF
     "ALLOW_DEPRECATIONS;DWARF_STRICT;ENABLE_ASSERTS;NO_UNDEFINED;WERROR"
@@ -139,6 +143,8 @@ macro(cet_set_target_compiler_flags _target)
   endif()
 endmacro()
 
+
+##Note! Turn this off, will replace for each target with the above macro
 #cet_set_compiler_flags_cxx(DIAGS CAUTIOUS
 #  WERROR
 #  NO_UNDEFINED
