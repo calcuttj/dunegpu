@@ -39,6 +39,8 @@ cet_build_plugin(GPUAnalyzer art::EDAnalyzer
   #lardataobj::Simulation
   #CUDA::cudart
   #cuda
+  larsim::Simulation
+  larcorealg::Geometry
   art::Framework_Principal
   art::Framework_Services_Registry
   art_plugin_support::toolMaker

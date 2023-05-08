@@ -24,6 +24,13 @@ int SimEnergyDepCuda::NumElectrons() {return numElectrons;}
 __host__ __device__
 int SimEnergyDepCuda::TrackID() {return trackID;}
 
+
+__host__ __device__
+int SimEnergyDepCuda::VoxelID() {return voxelID;}
+
+__host__ __device__
+void SimEnergyDepCuda::SetVoxelID(int v) {voxelID = v;}
+
 __host__ __device__
 float SimEnergyDepCuda::Energy() {return edep;}
 
