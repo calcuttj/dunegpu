@@ -1,5 +1,6 @@
 #ifndef BTRHELPER_H
 #define BTRHELPER_H
+#include <iostream>
 namespace gpu {
 struct BTRHelper {
   public:
@@ -12,16 +13,23 @@ struct BTRHelper {
 
     __host__ __device__
     BTRHelper(int nfast, int nslow, int tid, float px, float py, float pz,
-              float tfast, float tslow, float ed)
+              double t, float ed)
       : nPhotFast(nfast),
         nPhotSlow(nslow),
         trackID(tid),
         posX(px),
         posY(py),
         posZ(pz),
-        timeFast(tfast),
-        timeSlow(tslow),
+        time(t),
         edep(ed) {};
+
+    __host__
+    friend std::ostream & operator << (std::ostream & out, const BTRHelper & b) {
+      out << b.trackID << " " << b.edep << "\n";
+      out << b.nPhotFast << " " << b.nPhotSlow << " " << b.time << "\n";
+      out << b.posX << " " << b.posY << " " << b.posZ << std::endl;
+      return out;
+    };
 
     int nPhotFast;
     int nPhotSlow;
@@ -29,8 +37,7 @@ struct BTRHelper {
     float posX;
     float posY;
     float posZ;
-    float timeFast;
-    float timeSlow;
+    double time;
     float edep;
      
 };

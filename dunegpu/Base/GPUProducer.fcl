@@ -1,11 +1,13 @@
 BEGIN_PROLOG
 
-gpuana:
+gpuprod:
 {
-  module_type:            "GPUAnalyzer"
+  module_type:            "GPUProducer"
   SimulationTag:        "IonAndScint"
   #LibraryFileName: "/cvmfs/dune.osgstorage.org/pnfs/fnal.gov/usr/dune/persistent/stash/PhotonPropagation/LibraryData/lib_Protodunev7_merged_avg.root"
   LibraryFileName: "/wclustre/dune/calcuttj/lib_Protodunev7_merged_avg.root"
+  FastDecayTime: 6
+  SlowDecayTime: 1600
 }
 
 

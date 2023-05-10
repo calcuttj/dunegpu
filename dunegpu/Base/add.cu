@@ -1,7 +1,10 @@
 #include "thrust/tuple.h"
+#include "thrust/copy.h"
+#include "thrust/remove.h"
 #include "add.cuh"
 
 namespace gpu {
+
   __global__ void setup_kernel(curandState * state) {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     /* Each thread gets same seed, a different sequence
@@ -58,24 +61,51 @@ namespace gpu {
     setup_kernel<<<1, 256>>>(state);
   }
 
-  void run_vis_functor(float * vis_table, int n_op_dets, int op_id,
-                       std::vector<SimEnergyDepCuda> & deps) {
-    std::cout << "Running vis functor" << std::endl;
-    thrust::host_vector<SimEnergyDepCuda> deps_host(deps.begin(), deps.end());
-    std::cout << "Made Deps host " << deps_host.size() << std::endl;
+  void run_vis_functor(float * vis_table, int n_op_dets,
+                       double fast_time, double slow_time,
+                       int op_id,
+                       std::vector<SimEnergyDepCuda> & deps,
+                       std::vector<BTRHelper> & btrs) {
 
-    thrust::device_vector<SimEnergyDepCuda> deps_dev(deps_host.begin(),
-                                                     deps_host.end());
-    std::cout << "Made Deps device " << deps_dev.size() << std::endl;
+
+
+
+    //make device deps vector
+    thrust::device_vector<SimEnergyDepCuda> deps_dev(deps.begin(), deps.end());
+
+    //Make rngs equal to deps vec size
+    thrust::device_vector<curandState> rng_vec(deps_dev.size());
+
+    auto pInit = thrust::make_zip_iterator(
+        thrust::make_tuple(thrust::counting_iterator<int>(0), rng_vec.begin()));
+    // initialize random generator
+    thrust::for_each_n(pInit, rng_vec.size(), curand_setup());
+
+    auto deps_rngs_start = thrust::make_zip_iterator(
+        thrust::make_tuple(deps_dev.begin(), rng_vec.begin()));
+
+    auto deps_rngs_end = thrust::make_zip_iterator(
+        thrust::make_tuple(deps_dev.end(), rng_vec.end()));
+
+    //Make results vector
     thrust::device_vector<BTRHelper> results(deps.size());
-    std::cout << "Made Results " << results.size() << std::endl;
-    thrust::transform_if(deps_dev.begin(), deps_dev.end(), results.begin(),
-                         vis_functor(vis_table, n_op_dets, op_id),
-                         is_visible(vis_table, n_op_dets, op_id));
-    printf("Results size: %zu\n", results.size());
-    std::cout << ((BTRHelper)results[0]).nPhotFast << " " <<
-                 ((BTRHelper)results[0]).nPhotSlow << " " <<
-                 ((BTRHelper)results[0]).trackID << std::endl;
+
+    //Do transformation
+    thrust::transform(deps_rngs_start, deps_rngs_end, results.begin(),
+                      vis_functor(vis_table, n_op_dets,
+                                  fast_time, slow_time, op_id));
+
+
+    //std::cout << ((BTRHelper)results[0]).nPhotFast << " " <<
+    //             ((BTRHelper)results[0]).nPhotSlow << " " <<
+    //             ((BTRHelper)results[0]).trackID << std::endl;
+
+    //std::cout << "N results: " << results.size() << std::endl;
+    auto removed_end = thrust::remove_if(results.begin(), results.end(), no_photons());
+    
+    thrust::host_vector<BTRHelper> host_results(results.begin(), removed_end);
+
+    btrs.insert(btrs.begin(), host_results.begin(), host_results.end());
   }
 }
 

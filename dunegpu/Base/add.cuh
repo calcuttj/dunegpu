@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "SimEnergyDepCuda.cuh"
 #include "thrust/pair.h"
+#include "thrust/tuple.h"
 #include "thrust/host_vector.h"
 #include "thrust/device_vector.h"
 #include "thrust/transform.h"
@@ -19,6 +20,16 @@ namespace gpu {
                float * visibility,
                curandState * state);
   void setup_rng_wrapper(curandState * state);
+
+  struct no_photons {
+    no_photons() {}
+
+    __host__ __device__
+    bool operator()(const BTRHelper & btrh) {
+      return ((btrh.nPhotFast + btrh.nPhotSlow) == 0);
+    }
+  };
+
 
   class is_visible {
     private:
@@ -37,42 +48,68 @@ namespace gpu {
       }
   };
 
-  void run_vis_functor(float * vis_table, int n_op_dets, int op_id,
-                       std::vector<SimEnergyDepCuda> & deps);
+  void run_vis_functor(float * vis_table, int n_op_dets,
+                       double fast_time, double slow_time, //TODO -- remove these
+                       int op_id, std::vector<SimEnergyDepCuda> & deps,
+                       std::vector<BTRHelper> & btrs);
 
   class vis_functor {
     private:
       float * fVisibilityTable;
       int fNOpDets;
+      double fFastDecayTime, fSlowDecayTime;//TODO -- remove these
       int fOpID;
     public:
-      vis_functor(float * vis_table, int n_opdets, int op_id)
+      vis_functor(float * vis_table, int n_opdets,
+                  double fast_time, double slow_time, //TODO -- remove these
+                  int op_id)
         : fVisibilityTable(vis_table),
           fNOpDets(n_opdets),
+          fFastDecayTime(fast_time),//TODO -- remove these
+          fSlowDecayTime(slow_time),//TODO -- remove these
           fOpID(op_id) {}
 
-      __host__ __device__
-      /*thrust::pair<float, float>*/
-      BTRHelper operator()(SimEnergyDepCuda & dep) {
+      using DepRNG = thrust::tuple<SimEnergyDepCuda &, curandState &>;
+      __device__
+      BTRHelper operator()(DepRNG input) {
 
+        auto & dep = thrust::get<0>(input);
+        auto & rng = thrust::get<1>(input);
         int vox_id = dep.VoxelID();
         float vis = fVisibilityTable[fNOpDets*vox_id + fOpID];
 
-        //auto result = thrust::make_pair<float, float>(dep.NumFPhotons()*vis,
-        //                                              dep.NumSPhotons()*vis);
+        int n_fast = 0;
+        int n_slow = 0;
+        if (vis > 1.e-9) {
+          n_fast = curand_poisson(&rng, dep.NumFPhotons()*vis);
+          n_slow = curand_poisson(&rng, dep.NumSPhotons()*vis);
+
+        }
+
         BTRHelper result(
-           (int)dep.NumFPhotons()*vis,
-           (int)dep.NumSPhotons()*vis,
+           n_fast,
+           n_slow,
            dep.TrackID(),
            dep.MidPointX(),
            dep.MidPointY(),
            dep.MidPointZ(),
-           0.,
-           0.,
+           dep.StartT(),
            dep.Energy()
         );
         return result;
       }
   };
+
+  struct curand_setup {
+    using init_tuple = thrust::tuple<int, curandState &>;
+    __device__
+    void operator()(init_tuple t) {
+      curandState s;
+      int id = thrust::get<0>(t);
+      curand_init(1234, id, 0, &s);
+      thrust::get<1>(t) = s;
+    }
+  };
+
 };
 #endif

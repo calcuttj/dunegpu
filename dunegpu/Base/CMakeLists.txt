@@ -4,7 +4,7 @@ add_library(gpuadd SHARED #Note! Create library from cuda code
   add.cuh
   SimEnergyDepCuda.cu
   SimEnergyDepCuda.cuh
-
+  BTRHelper.cuh
   )
 
 # Request that particles be built with -std=c++11
@@ -38,7 +38,7 @@ target_link_libraries(gpuadd
                       Thrust
                      )
 
-cet_build_plugin(GPUAnalyzer art::EDAnalyzer
+cet_build_plugin(GPUProducer art::EDProducer
   LIBRARIES PRIVATE
   gpuadd
   #lardataobj::Simulation
@@ -56,7 +56,7 @@ cet_build_plugin(GPUAnalyzer art::EDAnalyzer
 
 
 
-cet_set_target_compiler_flags(dunegpu_Base_GPUAnalyzer_module) ##Note! Here's a target-specific cet-style compiler flag call
+cet_set_target_compiler_flags(dunegpu_Base_GPUProducer_module) ##Note! Here's a target-specific cet-style compiler flag call
 function(get_all_targets var)
     set(targets)
     get_all_targets_recursive(targets ${CMAKE_CURRENT_SOURCE_DIR})
