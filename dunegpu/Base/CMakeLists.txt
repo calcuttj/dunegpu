@@ -31,7 +31,12 @@ set_target_properties( gpuadd #Note! This makes it so it can be linked
                        PROPERTIES CUDA_SEPARABLE_COMPILATION ON
                       )
 
-target_link_libraries(gpuadd PUBLIC lardataobj::Simulation  ${CUDA_LIBRARIES})
+target_link_libraries(gpuadd
+                      PUBLIC
+                      lardataobj::Simulation
+                      ${CUDA_LIBRARIES}
+                      Thrust
+                     )
 
 cet_build_plugin(GPUAnalyzer art::EDAnalyzer
   LIBRARIES PRIVATE

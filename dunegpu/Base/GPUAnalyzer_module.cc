@@ -85,12 +85,15 @@ GPUAnalyzer::GPUAnalyzer(fhicl::ParameterSet const& p)
 
 void GPUAnalyzer::beginJob() {
   //ROOT::EnableImplicitMT(fNThreads);
+  std::cout << "Loading library" << std::endl;
   fLibraryFile = TFile::Open(fLibraryFileName.c_str());
   //TODO -- Wrap in exception
+  std::cout << "File: " << fLibraryFile << std::endl;
   fLibraryTree = (TTree*)fLibraryFile->Get("PhotonLibraryData");
+  std::cout << "Tree: " << fLibraryTree << std::endl;
 
   art::ServiceHandle<geo::Geometry const> geom;
-  size_t NOpDets = geom->NOpDets();
+  int NOpDets = geom->NOpDets();
   size_t NVoxels = fPVS->GetVoxelDef().GetNVoxels();
 
   size_t n_entries = NOpDets*NVoxels;
@@ -104,8 +107,12 @@ void GPUAnalyzer::beginJob() {
   fLibraryTree->SetBranchAddress("Visibility", &Visibility);
   for (int i = 0; i < fLibraryTree->GetEntries(); ++i) {
     fLibraryTree->GetEntry(i);
-    fVisibilityTable[Voxel*NOpDets + OpChannel] = Visibility;
+    int index = Voxel*NOpDets + OpChannel;
+    //std::cout << Voxel << " " << NOpDets << " " << OpChannel << std::endl;
+    //std::cout << "Got entry " << i << " " << index << " " << n_entries << std::endl;
+    fVisibilityTable[index] = Visibility;
   }
+  std::cout << "Loaded library" << std::endl;
 
   /*
   int n_split = ceil(n_entries/fNThreads);
@@ -148,13 +155,22 @@ void GPUAnalyzer::endJob() {
   fLibraryFile->Close();
 }
 
+
 void GPUAnalyzer::analyze(art::Event const& e)
 {
   // Implementation of required member function here.
   auto allDeps = e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag);
   size_t ndeps = allDeps->size();
 
-  SimEnergyDepCuda * cuda_deps;
+  std::vector<SimEnergyDepCuda> cuda_deps;
+  for (size_t i = 0; i < ndeps; ++i) {
+    cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
+    int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
+        fMapping->detectorToLibrary((*allDeps)[i].MidPoint()));
+    cuda_deps[i].SetVoxelID(voxel_id);
+  }
+
+  /*SimEnergyDepCuda * cuda_deps;
   cudaMallocManaged(&cuda_deps, ndeps*sizeof(SimEnergyDepCuda));
   for (size_t i = 0; i < ndeps; ++i) {
     cuda_deps[i] = SimEnergyDepCuda((*allDeps)[i]);
@@ -162,8 +178,7 @@ void GPUAnalyzer::analyze(art::Event const& e)
     int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
         fMapping->detectorToLibrary((*allDeps)[i].MidPoint()));
     cuda_deps[i].SetVoxelID(voxel_id);
-  }
-
+  }*/
 
   curandState * rng;
   cudaMallocManaged((void **)&rng, 256*sizeof(curandState));
@@ -172,7 +187,22 @@ void GPUAnalyzer::analyze(art::Event const& e)
   std::cout << "Calling wrapper" << std::endl;
   art::ServiceHandle<geo::Geometry const> geom;
   size_t NOpDets = geom->NOpDets();
-  gpu::wrapper(NOpDets, cuda_deps, fVisibilityTable, rng);
+  printf("%zu Op Dets\n", NOpDets);
+
+  int op_id = 0;
+  //thrust::transform(cuda_deps_dev.begin(), cuda_deps_dev.end(), results.begin(),
+  //                  gpu::vis_functor(fVisibilityTable, NOpDets, op_id));
+  gpu::run_vis_functor(fVisibilityTable, NOpDets, op_id, cuda_deps);
+  std::cout << "Done" << std::endl;
+  //std::cout << results.size() << " " << results[0] << std::endl;
+  
+
+  /*
+  std::pair<int, int> * det_phots;
+  cudaMallocManaged(&det_phots, ndeps*NOpDets*sizeof(std::pair<int,int>));
+
+  gpu::wrapper(NOpDets, ndeps, cuda_deps, det_phots, fVisibilityTable, rng);
+  */
 }
 
 DEFINE_ART_MODULE(GPUAnalyzer)

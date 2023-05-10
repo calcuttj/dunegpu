@@ -28,4 +28,5 @@ class SimEnergyDepCuda {
     float edep;
     float midPointX, midPointY, midPointZ;
     double startTime;
+
 };

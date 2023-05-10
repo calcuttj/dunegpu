@@ -4,7 +4,8 @@ gpuana:
 {
   module_type:            "GPUAnalyzer"
   SimulationTag:        "IonAndScint"
-  LibraryFileName: "/cvmfs/dune.osgstorage.org/pnfs/fnal.gov/usr/dune/persistent/stash/PhotonPropagation/LibraryData/lib_Protodunev7_merged_avg.root"
+  #LibraryFileName: "/cvmfs/dune.osgstorage.org/pnfs/fnal.gov/usr/dune/persistent/stash/PhotonPropagation/LibraryData/lib_Protodunev7_merged_avg.root"
+  LibraryFileName: "/wclustre/dune/calcuttj/lib_Protodunev7_merged_avg.root"
 }
 
 
