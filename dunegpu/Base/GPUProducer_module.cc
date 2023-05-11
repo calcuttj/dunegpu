@@ -172,6 +172,7 @@ void GPUProducer::endJob() {
 
 void GPUProducer::produce(art::Event & e) {
 
+  //Tell art you're saving these
   art::ServiceHandle<geo::Geometry const> geom;
   size_t NOpDets = geom->NOpDets();
   auto phlit = std::make_unique<std::vector<sim::SimPhotonsLite>>();
@@ -184,10 +185,12 @@ void GPUProducer::produce(art::Event & e) {
   }
 
 
-  // Implementation of required member function here.
+  //Get the energy deposits
   auto allDeps = e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag);
   size_t ndeps = allDeps->size();
 
+  //Turn them into objects that can be run on the GPUs
+  //This is a limiting factor & inefficiency
   std::vector<SimEnergyDepCuda> cuda_deps;
   for (size_t i = 0; i < ndeps; ++i) {
     cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
@@ -196,21 +199,36 @@ void GPUProducer::produce(art::Event & e) {
     cuda_deps[i].SetVoxelID(voxel_id);
   }
 
+  /*
   curandState * rng;
   cudaMallocManaged((void **)&rng, 256*sizeof(curandState));
   gpu::setup_rng_wrapper(rng);
+  */
 
-  std::cout << "Calling wrapper" << std::endl;
   printf("%zu Op Dets\n", NOpDets);
 
+  //Loop over the channel ids
   for (size_t op_id = 0; op_id < NOpDets; ++op_id) {
-    std::cout << "Channel " << op_id << std::endl;
-    std::vector<gpu::BTRHelper> btr_results;
-    gpu::run_vis_functor(fVisibilityTable, NOpDets, fFastDecayTime,
-                         fSlowDecayTime, op_id, cuda_deps, btr_results);
-    std::cout << "Done " << btr_results.size() << std::endl;
+    //std::cout << "Channel " << op_id << std::endl;
 
-    //std::cout << btr_results[0] << std::endl;
+    //For each channel ID, call the wrapper function.
+    //It will use thrust vectors and perform 'transformations'
+    //which will get the visibility from the stored library
+    //multiply that by the number of slow/fast photons 
+    //created at each energy deposit and generate poisson-dist'd
+    //number of photons that were detected by the given optical detector
+    //
+    //It only saves OpDet helper containers that had >0 photons detected
+    std::vector<gpu::BTRHelper> btr_results;
+    gpu::run_vis_functor(fVisibilityTable, NOpDets, op_id, cuda_deps,
+                         btr_results);
+    //std::cout << "Done " << btr_results.size() << std::endl;
+
+    //Go over the results and turn into the art-root objects that can be saved
+    //For each slow/fast photon calculate a random time at which it reaches the
+    //opdet and add it to the event record
+    //
+    //Could multi-thread (on CPU) this maybe
     for (auto & btrh : btr_results) {
       int nfast = btrh.nPhotFast;
       sim::OpDetBacktrackerRecord tmpbtr(op_id);

@@ -62,7 +62,6 @@ namespace gpu {
   }
 
   void run_vis_functor(float * vis_table, int n_op_dets,
-                       double fast_time, double slow_time,
                        int op_id,
                        std::vector<SimEnergyDepCuda> & deps,
                        std::vector<BTRHelper> & btrs) {
@@ -92,8 +91,7 @@ namespace gpu {
 
     //Do transformation
     thrust::transform(deps_rngs_start, deps_rngs_end, results.begin(),
-                      vis_functor(vis_table, n_op_dets,
-                                  fast_time, slow_time, op_id));
+                      vis_functor(vis_table, n_op_dets, op_id));
 
 
     //std::cout << ((BTRHelper)results[0]).nPhotFast << " " <<

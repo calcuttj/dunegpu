@@ -49,7 +49,6 @@ namespace gpu {
   };
 
   void run_vis_functor(float * vis_table, int n_op_dets,
-                       double fast_time, double slow_time, //TODO -- remove these
                        int op_id, std::vector<SimEnergyDepCuda> & deps,
                        std::vector<BTRHelper> & btrs);
 
@@ -57,16 +56,12 @@ namespace gpu {
     private:
       float * fVisibilityTable;
       int fNOpDets;
-      double fFastDecayTime, fSlowDecayTime;//TODO -- remove these
       int fOpID;
     public:
       vis_functor(float * vis_table, int n_opdets,
-                  double fast_time, double slow_time, //TODO -- remove these
                   int op_id)
         : fVisibilityTable(vis_table),
           fNOpDets(n_opdets),
-          fFastDecayTime(fast_time),//TODO -- remove these
-          fSlowDecayTime(slow_time),//TODO -- remove these
           fOpID(op_id) {}
 
       using DepRNG = thrust::tuple<SimEnergyDepCuda &, curandState &>;
