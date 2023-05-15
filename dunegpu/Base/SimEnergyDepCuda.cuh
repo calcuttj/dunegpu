@@ -1,3 +1,5 @@
+#ifndef SIMENERGYDEPCUDA_H
+#define SIMENERGYDEPCUDA_H
 #include "lardataobj/Simulation/SimEnergyDeposit.h"
 
 
@@ -30,3 +32,4 @@ class SimEnergyDepCuda {
     double startTime;
 
 };
+#endif

@@ -169,6 +169,7 @@ void GPUProducer::endJob() {
   fLibraryFile->Close();
 }
 
+//void GPUProducer::DepLoop(std::vector<SimEnergyDepCuda> & deps
 
 void GPUProducer::produce(art::Event & e) {
 
@@ -186,16 +187,16 @@ void GPUProducer::produce(art::Event & e) {
 
 
   //Get the energy deposits
-  auto allDeps = e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag);
-  size_t ndeps = allDeps->size();
+  auto allDeps = *(e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag));
+  size_t ndeps = allDeps.size();
 
   //Turn them into objects that can be run on the GPUs
   //This is a limiting factor & inefficiency
-  std::vector<SimEnergyDepCuda> cuda_deps;
+  std::vector<SimEnergyDepCuda> cuda_deps(allDeps.begin(), allDeps.end());
   for (size_t i = 0; i < ndeps; ++i) {
-    cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
+    //cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
     int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
-        fMapping->detectorToLibrary((*allDeps)[i].MidPoint()));
+        fMapping->detectorToLibrary(allDeps[i].MidPoint()));
     cuda_deps[i].SetVoxelID(voxel_id);
   }
 

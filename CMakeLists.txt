@@ -18,9 +18,11 @@ cmake_minimum_required (VERSION 3.12)
 
 project(dunegpu LANGUAGES CXX C CUDA) ##Note! Need to add CUDA to languages
 
+set(IGNORE_ABSOLUTE_TRANSITIVE_DEPENDENCIES ON)
+
 # cetbuildtools contains our cmake modules
 find_package(cetbuildtools REQUIRED)
-find_package( CUDA REQUIRED ) ##Note! Make sure to find cuda
+find_package( CUDA REQUIRED EXPORT ) ##Note! Make sure to find cuda
 find_package(Thrust REQUIRED CONFIG) ##Note! Also finding Thrust
 thrust_create_target(Thrust)
 

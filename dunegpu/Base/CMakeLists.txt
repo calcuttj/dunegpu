@@ -1,11 +1,15 @@
 include_directories("${CUDA_INCLUDE_DIRS}") #Note! Make sure to grab cuda incs
-add_library(gpuadd SHARED #Note! Create library from cuda code
-  add.cu
-  add.cuh
-  SimEnergyDepCuda.cu
-  SimEnergyDepCuda.cuh
-  BTRHelper.cuh
-  )
+art_make_library(
+  LIBRARY_NAME gpuadd
+  SOURCE add.cu SimEnergyDepCuda.cu 
+)
+#add_library(gpuadd SHARED #Note! Create library from cuda code
+#  add.cu
+#  add.cuh
+#  SimEnergyDepCuda.cu
+#  SimEnergyDepCuda.cuh
+#  BTRHelper.cuh
+#  )
 
 # Request that particles be built with -std=c++11
 # As this is a public compile feature anything that links to particles
@@ -14,6 +18,7 @@ target_compile_features(gpuadd #Note! Give it c++17
                         PUBLIC
                         cxx_std_17
                         )
+set_target_properties(gpuadd PROPERTIES CUDA_ARCHITECTURES "60")
 
 #target_compile_options(gpuadd
 #                       PUBLIC
@@ -55,7 +60,6 @@ cet_build_plugin(GPUProducer art::EDProducer
 )
 
 
-
 cet_set_target_compiler_flags(dunegpu_Base_GPUProducer_module) ##Note! Here's a target-specific cet-style compiler flag call
 function(get_all_targets var)
     set(targets)
@@ -79,7 +83,7 @@ message("All targets: ${all_targets}")
 
 
 #Note! Make sure to install new cuda library
-install(TARGETS gpuadd DESTINATION slf7.x86_64.e20.prof/lib/)
+#install(TARGETS gpuadd DESTINATION slf7.x86_64.e20.prof/lib/)
 
 install_headers()
 install_fhicl()
