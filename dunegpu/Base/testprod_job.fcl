@@ -1,6 +1,6 @@
-#include "GPUProducer.fcl"
+#include "TestProd.fcl"
 #include "services_refactored_pdune.fcl"
-process_name: GPU 
+process_name: Test
 
 
 services:
@@ -21,7 +21,7 @@ physics:
 {
 
  producers: { 
-   gpu: @local::gpuprod 
+   test: @local::testprod 
  }
 
  analyzers:
@@ -29,7 +29,7 @@ physics:
  
  ana:  [ ]
 
- simulate: [ gpu ]
+ simulate: [ test ]
  stream1: [ out1 ]
  
  trigger_paths: [ simulate ]
@@ -42,7 +42,7 @@ outputs:
   out1:
   {
     module_type: RootOutput
-    fileName:    "%ifb_gpuphot.root"
+    fileName:    "%ifb_testphot.root"
     dataTier:    "simulated"
     #outputCommands: [ "keep *" ]
     outputCommands: [ "keep *", "drop sim::SimEnergyDeposits_largeant_*_G4"]
@@ -54,4 +54,4 @@ outputs:
   }
 }
 
-physics.producers.gpu.NThreads: 4
+

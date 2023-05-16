@@ -19,6 +19,7 @@ target_compile_features(gpuadd #Note! Give it c++17
                         cxx_std_17
                         )
 set_target_properties(gpuadd PROPERTIES CUDA_ARCHITECTURES "60")
+target_compile_definitions(gpuadd PRIVATE DOCUDA)
 
 #target_compile_options(gpuadd
 #                       PUBLIC
@@ -59,6 +60,21 @@ cet_build_plugin(GPUProducer art::EDProducer
   CLHEP::Random
 )
 
+cet_build_plugin(TestProd art::EDProducer
+  LIBRARIES PRIVATE
+  gpuadd
+  #lardataobj::Simulation
+  #CUDA::cudart
+  #cuda
+  larsim::Simulation
+  larcorealg::Geometry
+  art::Framework_Principal
+  art::Framework_Services_Registry
+  art_plugin_support::toolMaker
+  canvas::canvas
+  fhiclcpp::fhiclcpp
+  CLHEP::Random
+)
 
 cet_set_target_compiler_flags(dunegpu_Base_GPUProducer_module) ##Note! Here's a target-specific cet-style compiler flag call
 function(get_all_targets var)
@@ -81,6 +97,7 @@ get_all_targets(all_targets)
 message("All targets: ${all_targets}")
 
 
+art_dictionary()
 
 #Note! Make sure to install new cuda library
 #install(TARGETS gpuadd DESTINATION slf7.x86_64.e20.prof/lib/)

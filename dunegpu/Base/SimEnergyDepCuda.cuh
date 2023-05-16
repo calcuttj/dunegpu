@@ -2,24 +2,31 @@
 #define SIMENERGYDEPCUDA_H
 #include "lardataobj/Simulation/SimEnergyDeposit.h"
 
+#ifdef DOCUDA
+#define HOSTDEVICE __host__ __device__
+#define HOST __host__
+#else
+#define HOSTDEVICE
+#define HOST
+#endif
 
 class SimEnergyDepCuda {
   public:
-    __host__ __device__ SimEnergyDepCuda() {};
-    __host__ SimEnergyDepCuda(const sim::SimEnergyDeposit & dep);
+    HOSTDEVICE SimEnergyDepCuda() {};
+    HOST SimEnergyDepCuda(const sim::SimEnergyDeposit & dep);
     //__host__ SimEnergyDepCuda(const 
-    __host__ __device__ ~SimEnergyDepCuda() {};
-    __host__ __device__ int NumFPhotons();
-    __host__ __device__ int NumSPhotons();
-    __host__ __device__ int NumElectrons();
-    __host__ __device__ int TrackID();
-    __host__ __device__ int VoxelID();
-    __host__ __device__ void SetVoxelID(int v);
-    __host__ __device__ float Energy();
-    __host__ __device__ float MidPointX();
-    __host__ __device__ float MidPointY();
-    __host__ __device__ float MidPointZ();
-    __host__ __device__ double StartT();
+    HOSTDEVICE ~SimEnergyDepCuda() {};
+    HOSTDEVICE int NumFPhotons();
+    HOSTDEVICE int NumSPhotons();
+    HOSTDEVICE int NumElectrons();
+    HOSTDEVICE int TrackID();
+    HOSTDEVICE int VoxelID();
+    HOSTDEVICE void SetVoxelID(int v);
+    HOSTDEVICE float Energy();
+    HOSTDEVICE float MidPointX();
+    HOSTDEVICE float MidPointY();
+    HOSTDEVICE float MidPointZ();
+    HOSTDEVICE double StartT();
 
   private:
     int numFPhotons;

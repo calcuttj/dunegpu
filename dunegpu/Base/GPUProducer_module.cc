@@ -31,10 +31,13 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TRandom3.h"
+#include <ROOT/TSeq.hxx>
 //#include <ROOT/TTreeProcessorMT.hxx>
 //#include "TTreeReader.h"
 
 #include <cmath>
+#include <thread>
+#include <mutex>
 
 class GPUProducer;
 
@@ -61,6 +64,13 @@ private:
   void AddOpDetBTR(std::vector<sim::OpDetBacktrackerRecord>& opbtr,
                    std::vector<int>& ChannelMap,
                    const sim::OpDetBacktrackerRecord& btr) const;
+  void DepLoop(std::vector<SimEnergyDepCuda> & deps,
+               size_t workid,
+               int n_workers);
+  void SaveLoop(std::vector<gpu::BTRHelper> & btr_results,
+                std::vector<sim::OpDetBacktrackerRecord> & opbtr,
+                std::vector<sim::SimPhotonsLite> & dir_phlitcol,
+                size_t workerid);
 
   // Declare member data here.
   art::ServiceHandle<phot::PhotonVisibilityService const> fPVS;
@@ -75,6 +85,7 @@ private:
   std::unique_ptr<phot::IPhotonMappingTransformations> fMapping;
 
   float * fVisibilityTable;
+  std::mutex fSaveMutex;
 };
 
 
@@ -99,7 +110,7 @@ GPUProducer::GPUProducer(fhicl::ParameterSet const& p)
 
 void GPUProducer::beginJob() {
   //ROOT::EnableImplicitMT(fNThreads);
-  std::cout << "Loading library" << std::endl;
+  mf::LogInfo("GPUProducer") << "Loading library" << std::endl;
   fLibraryFile = TFile::Open(fLibraryFileName.c_str());
   //TODO -- Wrap in exception
   std::cout << "File: " << fLibraryFile << std::endl;
@@ -126,7 +137,7 @@ void GPUProducer::beginJob() {
     //std::cout << "Got entry " << i << " " << index << " " << n_entries << std::endl;
     fVisibilityTable[index] = Visibility;
   }
-  std::cout << "Loaded library" << std::endl;
+  mf::LogInfo("GPUProducer") << "Loaded library" << std::endl;
 
   /*
   int n_split = ceil(n_entries/fNThreads);
@@ -169,7 +180,16 @@ void GPUProducer::endJob() {
   fLibraryFile->Close();
 }
 
-//void GPUProducer::DepLoop(std::vector<SimEnergyDepCuda> & deps
+void GPUProducer::DepLoop(std::vector<SimEnergyDepCuda> & deps, size_t workid, int n_workers) {
+  printf("Thread %zu, n_workers: %i\n", workid, n_workers);
+  for (size_t i = workid; i < deps.size(); i += n_workers) {
+    int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
+        fMapping->detectorToLibrary({deps[i].MidPointX(),
+                                     deps[i].MidPointY(),
+                                     deps[i].MidPointZ()}));
+    deps[i].SetVoxelID(voxel_id);
+  }
+}
 
 void GPUProducer::produce(art::Event & e) {
 
@@ -187,30 +207,44 @@ void GPUProducer::produce(art::Event & e) {
 
 
   //Get the energy deposits
-  auto allDeps = *(e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag));
-  size_t ndeps = allDeps.size();
+  //auto allDeps = *(e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag));
+  auto cuda_deps = *(e.getValidHandle<std::vector<SimEnergyDepCuda>>("test"));
+  //size_t ndeps = allDeps.size();
 
   //Turn them into objects that can be run on the GPUs
   //This is a limiting factor & inefficiency
-  std::vector<SimEnergyDepCuda> cuda_deps(allDeps.begin(), allDeps.end());
-  for (size_t i = 0; i < ndeps; ++i) {
-    //cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
-    int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
-        fMapping->detectorToLibrary(allDeps[i].MidPoint()));
-    cuda_deps[i].SetVoxelID(voxel_id);
+  //mf::LogInfo("GPUProducer") << "Making Deps " << allDeps.size() << std::endl;
+  //std::vector<SimEnergyDepCuda> cuda_deps(allDeps.begin(), allDeps.end());
+  mf::LogInfo("GPUProducer") << "Done" << std::endl;
+
+  std::vector<std::thread> workers;
+  for (auto workerid : ROOT::TSeqI(fNThreads)) {
+    std::thread worker(&GPUProducer::DepLoop, this,
+        std::ref(cuda_deps), workerid, fNThreads);
+    workers.emplace_back(std::move(worker));
+    //workers.emplace_back(&AbsCexDriver::RefillSampleLoop, this,
+       // events, samples, signal_sample_checks, beam_energy_bins,
+       // signal_pars, flux_pars, syst_pars, fit_under_over,
+       // tie_under_over, use_beam_inst_P, fill_incident, fix_factors,
+       // workerid, events_split);
   }
 
-  /*
-  curandState * rng;
-  cudaMallocManaged((void **)&rng, 256*sizeof(curandState));
-  gpu::setup_rng_wrapper(rng);
-  */
+  for (auto &&worker : workers) { worker.join();}
+
+  //DepLoop(cuda_deps, 0, 1);
+  //for (size_t i = 0; i < ndeps; ++i) {
+  //  //cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
+  //  int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
+  //      fMapping->detectorToLibrary(allDeps[i].MidPoint()));
+  //  cuda_deps[i].SetVoxelID(voxel_id);
+  //}
 
   printf("%zu Op Dets\n", NOpDets);
 
   //Loop over the channel ids
+  mf::LogInfo("GPUProducer") << "Starting processing" << std::endl;
   for (size_t op_id = 0; op_id < NOpDets; ++op_id) {
-    //std::cout << "Channel " << op_id << std::endl;
+    auto chan_start = std::chrono::high_resolution_clock::now();
 
     //For each channel ID, call the wrapper function.
     //It will use thrust vectors and perform 'transformations'
@@ -223,14 +257,18 @@ void GPUProducer::produce(art::Event & e) {
     std::vector<gpu::BTRHelper> btr_results;
     gpu::run_vis_functor(fVisibilityTable, NOpDets, op_id, cuda_deps,
                          btr_results);
-    //std::cout << "Done " << btr_results.size() << std::endl;
+    auto chan_end = std::chrono::high_resolution_clock::now();
+    auto delta_proc = std::chrono::duration_cast<std::chrono::milliseconds>(
+        chan_end - chan_start).count();
+    std::cout << "Processing " << op_id << " took " << delta_proc << std::endl;
 
     //Go over the results and turn into the art-root objects that can be saved
     //For each slow/fast photon calculate a random time at which it reaches the
     //opdet and add it to the event record
     //
     //Could multi-thread (on CPU) this maybe
-    for (auto & btrh : btr_results) {
+    auto save_start = std::chrono::high_resolution_clock::now();
+    /*for (auto & btrh : btr_results) {
       int nfast = btrh.nPhotFast;
       sim::OpDetBacktrackerRecord tmpbtr(op_id);
       double pos[3] = {btrh.posX, btrh.posY, btrh.posZ};
@@ -257,11 +295,63 @@ void GPUProducer::produce(art::Event & e) {
                                        btrh.edep);
       }
       AddOpDetBTR(*opbtr, PDChannelToSOCMapDirect, tmpbtr);
+    }*/
+
+    std::vector<std::thread> save_workers;
+    for (auto workerid : ROOT::TSeqI(fNThreads)) {
+      std::thread worker(&GPUProducer::SaveLoop, this,
+          std::ref(btr_results), std::ref(*opbtr), std::ref(dir_phlitcol),
+                   workerid);
+      save_workers.emplace_back(std::move(worker));
     }
+    for (auto &&worker : save_workers) { worker.join();}
+
+    auto save_end = std::chrono::high_resolution_clock::now();
+    auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+        save_end - save_start).count();
+    std::cout << "Saving took " << delta << std::endl;
   }
 
   e.put(move(phlit));
   e.put(move(opbtr));
+}
+
+void GPUProducer::SaveLoop(std::vector<gpu::BTRHelper> & btr_results,
+                           std::vector<sim::OpDetBacktrackerRecord> & opbtr,
+                           std::vector<sim::SimPhotonsLite> & dir_phlitcol,
+                           size_t workerid) {
+
+  std::vector<int> PDChannelToSOCMapDirect(dir_phlitcol.size(), -1);
+  for (size_t i = workerid; i < btr_results.size(); i += fNThreads) {
+    auto & btrh = btr_results[i];
+    int nfast = btrh.nPhotFast;
+    sim::OpDetBacktrackerRecord tmpbtr(workerid);
+    double pos[3] = {btrh.posX, btrh.posY, btrh.posZ};
+    for (int i = 0; i < nfast; ++i) {
+      double dtime = btrh.time - fFastDecayTime*std::log(fRNG.Uniform());
+      int time = static_cast<int>(std::round(dtime));
+      ++dir_phlitcol[workerid].DetectedPhotons[time];
+      tmpbtr.AddScintillationPhotons(btrh.trackID,
+                                     time,
+                                     1,
+                                     pos,
+                                     btrh.edep);
+    }
+    
+    int nslow = btrh.nPhotSlow;
+    for (int i = 0; i < nslow; ++i) {
+      double dtime = btrh.time - fSlowDecayTime*std::log(fRNG.Uniform());
+      int time = static_cast<int>(std::round(dtime));
+      ++dir_phlitcol[workerid].DetectedPhotons[time];
+      tmpbtr.AddScintillationPhotons(btrh.trackID,
+                                     time,
+                                     1,
+                                     pos,
+                                     btrh.edep);
+    }
+    std::lock_guard<std::mutex> guard(fSaveMutex);
+    AddOpDetBTR(opbtr, PDChannelToSOCMapDirect, tmpbtr);
+  }
 }
 
 void GPUProducer::AddOpDetBTR(std::vector<sim::OpDetBacktrackerRecord>& opbtr,

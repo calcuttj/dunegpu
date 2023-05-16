@@ -1,0 +1,7 @@
+<lcgdict>
+  <class name="SimEnergyDepCuda" ClassVersion="10">
+   <version ClassVersion="10" checksum="604743012"/>
+  </class>
+  <class name="std::vector<SimEnergyDepCuda>"/>
+  <class name="art::Wrapper<std::vector<SimEnergyDepCuda>>"/>
+</lcgdict>
