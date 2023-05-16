@@ -207,14 +207,13 @@ void GPUProducer::produce(art::Event & e) {
 
 
   //Get the energy deposits
-  //auto allDeps = *(e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag));
-  auto cuda_deps = *(e.getValidHandle<std::vector<SimEnergyDepCuda>>("test"));
+  auto allDeps = *(e.getValidHandle<std::vector<sim::SimEnergyDeposit>>(fSimulationTag));
+  //auto cuda_deps = *(e.getValidHandle<std::vector<SimEnergyDepCuda>>("test"));
   //size_t ndeps = allDeps.size();
 
   //Turn them into objects that can be run on the GPUs
-  //This is a limiting factor & inefficiency
   //mf::LogInfo("GPUProducer") << "Making Deps " << allDeps.size() << std::endl;
-  //std::vector<SimEnergyDepCuda> cuda_deps(allDeps.begin(), allDeps.end());
+  std::vector<SimEnergyDepCuda> cuda_deps(allDeps.begin(), allDeps.end());
   mf::LogInfo("GPUProducer") << "Done" << std::endl;
 
   std::vector<std::thread> workers;
@@ -228,16 +227,7 @@ void GPUProducer::produce(art::Event & e) {
        // tie_under_over, use_beam_inst_P, fill_incident, fix_factors,
        // workerid, events_split);
   }
-
   for (auto &&worker : workers) { worker.join();}
-
-  //DepLoop(cuda_deps, 0, 1);
-  //for (size_t i = 0; i < ndeps; ++i) {
-  //  //cuda_deps.push_back(SimEnergyDepCuda((*allDeps)[i]));
-  //  int voxel_id = fPVS->GetVoxelDef().GetVoxelID(
-  //      fMapping->detectorToLibrary(allDeps[i].MidPoint()));
-  //  cuda_deps[i].SetVoxelID(voxel_id);
-  //}
 
   printf("%zu Op Dets\n", NOpDets);
 
